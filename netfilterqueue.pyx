@@ -184,6 +184,20 @@ cdef class NetfilterQueue:
             with nogil:
                 rv = recv(fd, buf, sizeof(buf), 0)
 
+    def run2(self):
+        """Version of the run method which uses normal socket.recv so that gevent can monkeypatch it."""
+        # https://github.com/kti/python-netfilterqueue/issues/5
+        import socket
+        cdef int fd = nfq_fd(self.h)
+        s = socket.fromfd(fd, socket.AF_UNIX, socket.SOCK_STREAM)
+        while True:
+            d = s.recv(BufferSize)
+            if d >= 0:
+                nfq_handle_packet(self.h, d, len(d))
+            else:
+                break
+        s.close()
+
 PROTOCOLS = {
     0: "HOPOPT",
     1: "ICMP",
