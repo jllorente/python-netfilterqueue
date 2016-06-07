@@ -180,17 +180,23 @@ cdef class NetfilterQueue:
         self.qh = NULL
         # See warning about nfq_unbind_pf in __dealloc__ above.
 
-    def run(self):
+    def get_fd(self):
+        """Get the file descriptor of the queue handler."""
+        return nfq_fd(self.h)
+
+    def run(self, block=True):
         """Begin accepting packets."""
         cdef int fd = nfq_fd(self.h)
         cdef char buf[BufferSize]
         cdef int rv
+        cdef int recv_flags
+        recv_flags = 0 if block else MSG_DONTWAIT
         with nogil:
-            rv = recv(fd, buf, sizeof(buf), 0)
+            rv = recv(fd, buf, sizeof(buf), recv_flags)
         while rv >= 0:
             nfq_handle_packet(self.h, buf, rv)
             with nogil:
-                rv = recv(fd, buf, sizeof(buf), 0)
+                rv = recv(fd, buf, sizeof(buf), recv_flags)
 
     def run2(self):
         """Version of the run method which uses normal socket.recv so that gevent can monkeypatch it."""
@@ -205,9 +211,6 @@ cdef class NetfilterQueue:
             else:
                 break
         s.close()
-
-    def get_fd(self):
-        return int(nfq_fd(self.h))
 
 PROTOCOLS = {
     0: "HOPOPT",
